@@ -2,6 +2,7 @@ import Z80 from "./Z80";
 import GPU from "./gpu";
 
 type MMU = {
+  _isWritingSecondByteOfWord: boolean;
   _inbios: number;
   _bios: number[];
   _rom: number[];
@@ -13,7 +14,7 @@ type MMU = {
 }
 const MMU: MMU = {
     _inbios: 1,
-    
+    _isWritingSecondByteOfWord: false, 
     //Memory Regions
     _bios: [0xC3, 0xFF, 0x00],
     _rom: [],
@@ -21,7 +22,7 @@ const MMU: MMU = {
       MMU._rom = instructions;
     },  
     rb: function(addr) { /* Read 8-bit byte from address */
-      switch(addr & 0xF000) { // & 0xF000 // Why bitwise addr with 0xF000?
+     switch(addr & 0xF000) { // & 0xF000 // Why mask addr with 0xF000?
         //BIOS (256b)/ROM0
         case 0x0000:
           if(MMU._inbios) { 
@@ -61,6 +62,7 @@ const MMU: MMU = {
     },
     wb: function(addr, value) { 
       /* Write 8-bit byte to address */
+      if(addr < 0x8000) console.log('writing a byte into ROM/BIOS. Address ', '0x'+(addr).toString(16));
       switch(addr & 0xF000) {
         case 0x0000:
             if(MMU._inbios) MMU._bios[addr] = value;
@@ -70,6 +72,7 @@ const MMU: MMU = {
         case 0x8000:
         case 0x9000:
           GPU._vram[addr & 0x7FFF] = value;
+          addr = addr & 0x7FFF;
           GPU.updatetile(addr, value);
         break;
         default: throw new Error(`Couldn't locate address ${addr}`);
@@ -77,7 +80,11 @@ const MMU: MMU = {
     },
     ww: function(addr, value) { 
       /* Write a 16-bit word to address */
-      MMU.wb(addr,value&255); MMU.wb(addr+1,value>>8);}
+      MMU.wb(addr,value&255); 
+      MMU._isWritingSecondByteOfWord = true;   
+      MMU.wb(addr+1,value>>8);
+      MMU._isWritingSecondByteOfWord = false;
+    }
   }
 
 export default MMU;

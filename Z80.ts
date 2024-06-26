@@ -38,6 +38,10 @@ const Z80: CPU = {
     Z80._r.m = 1; Z80._r.t = 4;
   },
   LDBCnn: function() { Z80._r.c=MMU.rb(Z80._r.pc); Z80._r.b=MMU.rb(Z80._r.pc+1); Z80._r.pc+=2; Z80._r.m=3; },
+  LDHLIA: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=2; },
+  INCBC: function() { Z80._r.c=(Z80._r.c+1)&255; if(!Z80._r.c) Z80._r.b=(Z80._r.b+1)&255; Z80._r.m=1; },
+  INCHL: function() { Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=1 },
+  LDABCm: function () { Z80._r.a=MMU.rb((Z80._r.b << 8)+Z80._r.c); Z80._r.m=2;  },
   ADDr_e: function() {
     console.log(`Add register E ${Z80._r.e} to register A ${Z80._r.a}`);
     Z80._r.a += Z80._r.e;
@@ -115,6 +119,7 @@ const Z80: CPU = {
       Z80._r.m = 4; Z80._r.t = 16;
     },
     LDmmHL: function() { const i = MMU.rw(Z80._r.pc); Z80._r.pc += 2; MMU.ww(i,(Z80._r.h<<8)+Z80._r.l); Z80._r.m = 5; },
+    LDHLmr_a: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.m=2; },
     LDHLmr_b: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.b); console.log(`Writing value in reg B ${Z80._r.b} into address ${(Z80._r.h<<8)+Z80._r.l}`); },
     LDHLnn: function() { Z80._r.h = MMU.rb(Z80._r.pc); Z80._r.l = MMU.rb(Z80._r.pc+1); console.log(`Load HL from PC and PC+1. H = ${Z80._r.h} L = ${Z80._r.l}`); Z80._r.pc += 2; Z80._r.m = 3; Z80._r.t = 12; },
     XOR_a: function() {
@@ -131,6 +136,7 @@ const Z80: CPU = {
       Z80._r.pc = target;
       Z80._r.m = 3; Z80._r.t = 12;
     },
+    INCHLm: function() { const i=(MMU.rb((Z80._r.h<<8)+Z80._r.l)+1)&255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=i?0:0x80; Z80._r.m=3; },
     HALT: function() {
       Z80._halt = 1;
       Z80._r.m = 1; Z80._r.t = 4;
@@ -166,24 +172,30 @@ function dispatcher() {
 
 
 Z80._map = [
-  Z80._ops.NOP,    // 0x00
-  Z80._ops.LDBCnn, // 0x01
+  Z80._ops.NOP,     // 0x00 * correct place
+  Z80._ops.LDBCnn,  // 0x01 * correct place
   Z80._ops.LDHLmr_b,// 0x02
-  Z80._ops.LDAmm,  // 0x03
-  Z80._ops.LDBmm,  // 0x04
-  Z80._ops.LDCmm,  // 0x05
-  Z80._ops.LDEmm,  // 0x06
-  Z80._ops.LDSPnn, // 0x07
-  Z80._ops.ADDr_e, // 0x08
-  Z80._ops.CPr_b,  // 0x09
-  Z80._ops.PUSHBC, // 0x0A
-  Z80._ops.POPHL,  // 0x0B
-  Z80._ops.XOR_a,  // 0x0C
-  Z80._ops.LDmmHL, // 0x0D
+  Z80._ops.INCBC,   // 0x03 * correct place
+  Z80._ops.LDAmm,   // 0x04
+  Z80._ops.LDBmm,   // 0x05
+  Z80._ops.LDCmm,   // 0x06
+  Z80._ops.LDEmm,   // 0x07
+  Z80._ops.LDSPnn,  // 0x08
+  Z80._ops.ADDr_e,  // 0x09
+  Z80._ops.LDABCm,  // 0x0A * correct place
+  Z80._ops.PUSHBC,  // 0x0B
+  Z80._ops.POPHL,   // 0x0C
+  Z80._ops.XOR_a,   // 0x0D
+  Z80._ops.LDmmHL,  // 0x0E
+  Z80._ops.CPr_b,   // 0x0F
 ];
 
 Z80._map[0x21] = Z80._ops.LDHLnn;
+Z80._map[0x22] = Z80._ops.LDHLIA;
+Z80._map[0x23] = Z80._ops.INCHL;
+Z80._map[0x34] = Z80._ops.INCHLm;
 Z80._map[0x76] = Z80._ops.HALT;
+Z80._map[0x77] = Z80._ops.LDHLmr_a;
 Z80._map[0xC3] = Z80._ops.JPnn;
 
 

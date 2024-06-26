@@ -62,10 +62,13 @@ const GPU: GPU = {
 
     renderScan: function() {},  
     updatetile: function(addr, value){
-      debugger;
+        let saddr = addr & 0x7FFF;
+        // VRAM starts at 0x8000, odd ADDR means its the second byte of the 16-bit word
+        // N&1 returns 1 for odd numbers
+        if(addr&1) { saddr--; addr--; }
+        else { return; } // if writing first byte of word skip updating tiles
         // get base address
         addr = addr & 0x7FFF;
-        if(addr === 0) return;
 
         //which tile and row was updated
         let tile = (addr >> 4) & 511;
@@ -76,12 +79,10 @@ const GPU: GPU = {
           //find bit index for this pixel
           sx = 1 << (7-x);
 
-          const firstByte = GPU._vram[addr] & sx;
-          const secondByte = GPU._vram[addr+1] & sx;
-
           // update tile set
           GPU._tileset[tile][y][x] = ((GPU._vram[addr] & sx) ? 1 : 0) + ((GPU._vram[addr+1] & sx) ? 2 : 0);
         }
+        debugger;
 
     },
   
