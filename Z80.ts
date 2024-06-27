@@ -34,14 +34,30 @@ const Z80: CPU = {
   },
   _halt: 0,
   _ops: {
-   NOP: function() {
-    Z80._r.m = 1; Z80._r.t = 4;
-  },
+  NOP: function() { Z80._r.m = 1; Z80._r.t = 4; },
+  // *== load instructions ==*
+  LDAmm: function() { let addr = MMU.rw(Z80._r.pc); Z80._r.pc += 2; Z80._r.a = MMU.rb(addr); Z80._r.m = 4; Z80._r.t = 16; },
+  LDBmm: function() { let addr = MMU.rb(Z80._r.pc); Z80._r.pc += 2; Z80._r.b = MMU.rb(addr); Z80._r.m = 4; Z80._r.t = 16; },
+  LDCmm: function(){ let addr = MMU.rw(Z80._r.pc); Z80._r.pc += 2; Z80._r.c = MMU.rb(addr); Z80._r.m = 4; Z80._r.t = 16; },
+  LDEmm: function() { let addr = MMU.rw(Z80._r.pc); Z80._r.pc += 2; Z80._r.e = MMU.rb(addr); Z80._r.m = 4; Z80._r.t = 16; },
   LDBCnn: function() { Z80._r.c=MMU.rb(Z80._r.pc); Z80._r.b=MMU.rb(Z80._r.pc+1); Z80._r.pc+=2; Z80._r.m=3; },
+  LDSPnn: function() { Z80._r.sp = MMU.rw(Z80._r.pc); Z80._r.pc += 2; Z80._r.m = 3; Z80._r.t = 12; },
   LDHLIA: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=2; },
+  LDABCm: function () { Z80._r.a=MMU.rb((Z80._r.b << 8)+Z80._r.c); Z80._r.m=2;  },
+  LDmmHL: function() { const i = MMU.rw(Z80._r.pc); Z80._r.pc += 2; MMU.ww(i,(Z80._r.h<<8)+Z80._r.l); Z80._r.m = 5; },
+  LDHLmr_a: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.m=2; },
+  LDHLmr_b: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.b); console.log(`Writing value in reg B ${Z80._r.b} into address ${(Z80._r.h<<8)+Z80._r.l}`); },
+  LDHLnn: function() { Z80._r.h = MMU.rb(Z80._r.pc); Z80._r.l = MMU.rb(Z80._r.pc+1); console.log(`Load HL from PC and PC+1. H = ${Z80._r.h} L = ${Z80._r.l}`); Z80._r.pc += 2; Z80._r.m = 3; Z80._r.t = 12; },
+  LDrn_d: function() { Z80._r.d=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
+  LDrn_e: function() { Z80._r.e=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
+  LDrr_ad: function() { Z80._r.a=Z80._r.d; Z80._r.m=1; },
+
+
+  //*== increase instructions ==*
+  INCr_e: function() { Z80._r.e++; Z80._r.e&=255; Z80._r.f=Z80._r.e?0:0x80; Z80._r.m=1; },
   INCBC: function() { Z80._r.c=(Z80._r.c+1)&255; if(!Z80._r.c) Z80._r.b=(Z80._r.b+1)&255; Z80._r.m=1; },
   INCHL: function() { Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=1 },
-  LDABCm: function () { Z80._r.a=MMU.rb((Z80._r.b << 8)+Z80._r.c); Z80._r.m=2;  },
+  INCHLm: function() { const i=(MMU.rb((Z80._r.h<<8)+Z80._r.l)+1)&255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=i?0:0x80; Z80._r.m=3; },
   ADDr_e: function() {
     console.log(`Add register E ${Z80._r.e} to register A ${Z80._r.a}`);
     Z80._r.a += Z80._r.e;
@@ -50,14 +66,9 @@ const Z80: CPU = {
     if(Z80._r.a > 255) Z80._r.f |= 0x10;
     Z80._r.m = 1; Z80._r.t = 4;
   },
-  CPr_b: function() {
-    console.log(`Compare register B ${Z80._r.b} to register A ${Z80._r.a}`)
-    let i = Z80._r.a;
-    Z80._r.a -= Z80._r.b;
-    Z80._r.f = 0x40;
-    if(!(Z80._r.a & 255)) Z80._r.f |= 0x80;
-    if(Z80._r.a > 0) Z80._r.f |= 0x10;
-  },
+  CPr_b: function() { let i = Z80._r.a; Z80._r.a -= Z80._r.b; Z80._r.f = 0x40; if(!(Z80._r.a & 255)) Z80._r.f |= 0x80; if(Z80._r.a > 0) Z80._r.f |= 0x10; },
+  CPr_d: function() { var i=Z80._r.a; i-=Z80._r.d; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.d^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
+  CPr_e: function() { var i=Z80._r.a; i-=Z80._r.e; Z80._r.f=(i<0)?0x50:0x40; i&=255; if(!i) Z80._r.f|=0x80; if((Z80._r.a^Z80._r.e^i)&0x10) Z80._r.f|=0x20; Z80._r.m=1; },
   PUSHBC: function() {
     Z80._r.sp--;
     MMU.wb(Z80._r.sp, Z80._r.b);
@@ -74,54 +85,6 @@ const Z80: CPU = {
     Z80._r.sp++;
     Z80._r.m = 3; Z80._r.t = 12;
   },
-    LDSPnn: function() {
-      Z80._r.sp = MMU.rw(Z80._r.pc);
-
-      console.log(`Loaded SP register with value ${Z80._r.sp}`);
-
-      Z80._r.pc += 2;
-      Z80._r.m = 3; Z80._r.t = 12;
-    },
-    LDAmm: function() {
-      let addr = MMU.rw(Z80._r.pc);
-
-      console.log(`Load value in address 0x${(addr).toString(16).toUpperCase()} (${addr}) to register A`);
-
-      Z80._r.pc += 2;
-      Z80._r.a = MMU.rb(addr);
-      Z80._r.m = 4; Z80._r.t = 16; 
-    },
-    LDBmm: function() {
-      let addr = MMU.rb(Z80._r.pc);
-
-      console.log(`Load value in address 0x${(addr).toString(16).toUpperCase()} (${addr}) to register B`);
-
-      Z80._r.pc += 2;
-      Z80._r.b = MMU.rb(addr);
-      Z80._r.m = 4; Z80._r.t = 16;
-    },
-    LDCmm: function(){
-      let addr = MMU.rw(Z80._r.pc);
-
-      console.log(`Load value in address 0x${(addr).toString(16).toUpperCase()} (${addr}) to register C`);
-
-      Z80._r.pc += 2;
-      Z80._r.c = MMU.rb(addr);
-      Z80._r.m = 4; Z80._r.t = 16;
-    },
-    LDEmm: function() {
-      let addr = MMU.rw(Z80._r.pc);
-
-      console.log(`Load value in address 0x${(addr).toString(16).toUpperCase()} (${addr}) to register E`);
-      
-      Z80._r.pc += 2;
-      Z80._r.e = MMU.rb(addr);
-      Z80._r.m = 4; Z80._r.t = 16;
-    },
-    LDmmHL: function() { const i = MMU.rw(Z80._r.pc); Z80._r.pc += 2; MMU.ww(i,(Z80._r.h<<8)+Z80._r.l); Z80._r.m = 5; },
-    LDHLmr_a: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.m=2; },
-    LDHLmr_b: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.b); console.log(`Writing value in reg B ${Z80._r.b} into address ${(Z80._r.h<<8)+Z80._r.l}`); },
-    LDHLnn: function() { Z80._r.h = MMU.rb(Z80._r.pc); Z80._r.l = MMU.rb(Z80._r.pc+1); console.log(`Load HL from PC and PC+1. H = ${Z80._r.h} L = ${Z80._r.l}`); Z80._r.pc += 2; Z80._r.m = 3; Z80._r.t = 12; },
     XOR_a: function() {
       Z80._r.a ^= Z80._r.a;
       Z80._r.a &= 255;
@@ -136,7 +99,7 @@ const Z80: CPU = {
       Z80._r.pc = target;
       Z80._r.m = 3; Z80._r.t = 12;
     },
-    INCHLm: function() { const i=(MMU.rb((Z80._r.h<<8)+Z80._r.l)+1)&255; MMU.wb((Z80._r.h<<8)+Z80._r.l,i); Z80._r.f=i?0:0x80; Z80._r.m=3; },
+    JPNZnn: function() { Z80._r.m=3; if((Z80._r.f&0x80)==0x00) { Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m++; } else Z80._r.pc+=2; },
     HALT: function() {
       Z80._halt = 1;
       Z80._r.m = 1; Z80._r.t = 4;
@@ -154,7 +117,7 @@ const Z80: CPU = {
   },
   exec: function() {
     let op = MMU.rb(Z80._r.pc++);
-    console.log("Executing OPCODE", op);
+    console.log("Executing OPCODE", '0x'+(op).toString(16));
     Z80._map[op]();
     // Z80._r.pc &= 65537;
     Z80._clock.m += Z80._r.m;
@@ -187,15 +150,23 @@ Z80._map = [
   Z80._ops.POPHL,   // 0x0C
   Z80._ops.XOR_a,   // 0x0D
   Z80._ops.LDmmHL,  // 0x0E
-  Z80._ops.CPr_b,   // 0x0F
+                    // 0x0F moved CPr_b to coreect address 0xB8
 ];
 
+Z80._map[0x16] = Z80._ops.LDrn_d; 
+Z80._map[0x1C] = Z80._ops.INCr_e;
+Z80._map[0x1E] = Z80._ops.LDrn_e;
 Z80._map[0x21] = Z80._ops.LDHLnn;
 Z80._map[0x22] = Z80._ops.LDHLIA;
 Z80._map[0x23] = Z80._ops.INCHL;
 Z80._map[0x34] = Z80._ops.INCHLm;
 Z80._map[0x76] = Z80._ops.HALT;
 Z80._map[0x77] = Z80._ops.LDHLmr_a;
+Z80._map[0x7A] = Z80._ops.LDrr_ad;
+Z80._map[0xB8] = Z80._ops.CPr_b; 
+Z80._map[0xBA] = Z80._ops.CPr_d
+Z80._map[0xBB] = Z80._ops.CPr_e;
+Z80._map[0xC2] = Z80._ops.JPNZnn;
 Z80._map[0xC3] = Z80._ops.JPnn;
 
 
