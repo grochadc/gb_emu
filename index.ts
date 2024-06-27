@@ -68,30 +68,27 @@ function runInstructions() {
     ];
 
     const LOOP_ROM = [
-     0x16, 0x04, // 0x16 LDD,n LDrn_d 0x04 / load register D with inmediate 8-bit (limit)
-     0x1E, 0x00, // 0x1E LDE,n LDrn_e  0x00 / load register E with inmediate 8-bit (counter)
+     0x16, 0x04, // 0x16 LDD,n LDrn_d 0x04 / load register D with inmediate 8-bit (counter down)
      0x00,       // 0x00 NOP / instructions to repeat
-     0x7A,       // 0x7A LDA,D LDrr_ad / load limit (0x04 in D reg) into A
-     0x1C,       // 0x1C INCE INCr_e / increase counter in register E
-     0xBB,       // 0xBB CPE CPr_E / compare register D with register A
-     0xC2, 0x04, 0x00, // 0xC2 JP NZ,nn JPNZnn 0x04, 0x00 / jump to start of loop if non-zero
+     0x15,       // 0x15 DECD DECr_d / decrease counter in register D
+     0xC2, 0x02, 0x00, // 0xC2 JP NZ,nn JPNZnn 0x04, 0x00 / jump to start of loop if non-zero
      0x76,       // 0x76 HALT
     ];
 
     const LOAD_SPRITE_AUTO_LOOP_ROM = [
-      0x01, 0x15, 0x00, // LDBCnn / load tileset addr (0x11, 0x00) into BC
+      0x01, 0x15, 0x00, // LDBCnn / load tileset addr (0x15, 0x00) into BC
       0x21, 0x80, 0x00, // LDHLnn / load VRAM addr (0x00, 0x80) into HL
-      0x16, 0x04,       // 0x16 LDD,n LDrn_d 0x04 / load register D with inmediate 8-bit (limit)
-      0x1E, 0x00,       // 0x1E LDE,n LDrn_e  0x00 / load register E with inmediate 8-bit (counter)
+      0x16, 0x02,       // 0x16 LDD,n LDrn_d 0x02 / load r_D with inmediate 8-bit (count)
       // start loop instructions
-      0x0A,             // LDA(BC) LDABCm / load lower-byte of tileset into A
-      0x03,             // INCBC / move to tile's higher-byte
+      0x0A,             // 0x0A LDA(BC) LDABCm / load lower-byte of tileset into A
+      0x03,             // 0x03 INCBC / move bytecount to tile's higher-byte addr
       0x22,             // 0x022 LDI(HL),A LDHLIA / load A into HL pointed and increase HL
+      0x0A,             // 0x0A LDA(BC)LDABCm / load higher-byte of tileset into A
+      0x22,             // 0x022 LDI(HL),A LDHLIA / load A into HL pointed and increase HL
+      0x03,             // 0x03 INCBC / move bytecount to next tile's lower-byte addr
       // end loop instructions
-      0x7A,             // 0x7A LDA,D LDrr_ad / load limit (0x04 in D reg) into A
-      0x1C,             // 0x1C INCE INCr_e / increase counter in register E
-      0xBB,             // 0xBB CPE CPr_E / compare register D with register A
-      0xC2, 0x0A, 0x00, // 0xC2 JP NZ,nn JPNZnn 0x00, 0x00 / jump to start of loop if non-zero
+      0x15,             // 0x15 DEC D DECr_d / decrease count in register D
+      0xC2, 0x08, 0x00, // 0xC2 JP NZ,nn JPNZnn 0x00, 0x00 / jump to start of loop if non-zero
       0x76,             // 0x76 HALT
       // ROM DATA BANK
       0x07, 0x07,       // 0x15 - 0x16
