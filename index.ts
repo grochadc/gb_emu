@@ -75,10 +75,10 @@ function runInstructions() {
      0x76,       // 0x76 HALT
     ];
 
-    const LOAD_SPRITE_AUTO_LOOP_ROM = [
-      0x01, 0x15, 0x00, // LDBCnn / load tileset addr (0x15, 0x00) into BC
-      0x21, 0x80, 0x00, // LDHLnn / load VRAM addr (0x00, 0x80) into HL
-      0x16, 0x02,       // 0x16 LDD,n LDrn_d 0x02 / load r_D with inmediate 8-bit (count)
+    const LOAD_TILE_LOOP_ROM = [
+      0x01, 0x13, 0x00, // 0x01 LDBCnn 0x015, 0x00 / load tileset addr into BC
+      0x21, 0x80, 0x00, // 0x21 LDHLnn 0x00, 0x80 / load VRAM addr into HL
+      0x16, 0x08,       // 0x16 LDD,n LDrn_d 0x04 / load r_D with inmediate 8-bit (count)
       // start loop instructions
       0x0A,             // 0x0A LDA(BC) LDABCm / load lower-byte of tileset into A
       0x03,             // 0x03 INCBC / move bytecount to tile's higher-byte addr
@@ -88,14 +88,21 @@ function runInstructions() {
       0x03,             // 0x03 INCBC / move bytecount to next tile's lower-byte addr
       // end loop instructions
       0x15,             // 0x15 DEC D DECr_d / decrease count in register D
-      0xC2, 0x08, 0x00, // 0xC2 JP NZ,nn JPNZnn 0x00, 0x00 / jump to start of loop if non-zero
+      0xC2, 0x08, 0x00, // 0xC2 JP NZ,nn JPNZnn 0x08, 0x00 / jump to start of loop if non-zero
       0x76,             // 0x76 HALT
-      // ROM DATA BANK
-      0x07, 0x07,       // 0x15 - 0x16
-      0x08, 0x08,       // 0x17 - 0x18
+      // ROM DATA BANK addr 0x13 - 0x26
+      0x07, 0x07,
+      0x08, 0x08,
+      0x10, 0x17,
+      0x20, 0x24,
+      0x20, 0x25,
+      0x20, 0x25,
+      0x20, 0x25,
+      0x20, 0x25,
+      0x20, 0x25,
     ];
 
-    MMU.load(LOAD_SPRITE_AUTO_LOOP_ROM);
+    MMU.load(LOAD_TILE_LOOP_ROM);
     MMU._bios[255] = 0x00; // NOP last instruction on BIOS, PC already jumped to exec 256
 
     startCPU();
