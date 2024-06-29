@@ -71,10 +71,16 @@ const MMU: MMU = {
 
         case 0x8000:
         case 0x9000:
-          GPU._vram[addr & 0x7FFF] = value;
-          addr = addr & 0x7FFF;
-          GPU.updatetile(addr, value);
+          GPU._vram[addr & 0x1FFF] = value;
+          // do not update if writing to tilemap > 0x9800
+          if (addr < 0x9800) GPU.updatetile(addr & 0x1FFF, value);
         break;
+        // GPU registers
+        case 0xF000:
+          switch(addr & 0xF0) {
+            case 0x40: case 0x50: case 0x60: case 0x70:
+              GPU.wb(addr, value);
+          } break;
         default: throw new Error(`Couldn't locate address ${addr}`);
       }
     },
