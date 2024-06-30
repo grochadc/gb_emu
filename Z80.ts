@@ -23,9 +23,11 @@ type CPU = {
   reset: () => void;
   exec: () => void;
   _map: any[];
+  _cbmap: any[];
 }
 const Z80: CPU = {
   _map: [],
+  _cbmap: [],
   _clock: { m:0, t: 0 },
   _r: {
     a:0, b:0, c:0, d:0, e:0, h:0, l:0, f:0, //8-bit registers
@@ -44,7 +46,7 @@ const Z80: CPU = {
   LDSPnn: function() { Z80._r.sp = MMU.rw(Z80._r.pc); Z80._r.pc += 2; Z80._r.m = 3; Z80._r.t = 12; },
   LDHLIA: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.l=(Z80._r.l+1)&255; if(!Z80._r.l) Z80._r.h=(Z80._r.h+1)&255; Z80._r.m=2; },
   LDABCm: function () { Z80._r.a=MMU.rb((Z80._r.b << 8)+Z80._r.c); Z80._r.m=2;  },
-  LDmmHL: function() { const i = MMU.rw(Z80._r.pc); Z80._r.pc += 2; MMU.ww(i,(Z80._r.h<<8)+Z80._r.l); Z80._r.m = 5; },
+  LDmmHL: function() { let i = MMU.rw(Z80._r.pc); Z80._r.pc += 2; MMU.ww(i,(Z80._r.h<<8)+Z80._r.l); Z80._r.m = 5; },
   LDHLmr_a: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.m=2; },
   LDHLmr_b: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l,Z80._r.b); console.log(`Writing value in reg B ${Z80._r.b} into address ${(Z80._r.h<<8)+Z80._r.l}`); },
   LDHLmn: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, MMU.rb(Z80._r.pc)); Z80._r.pc++; Z80._r.m=3; },
@@ -52,6 +54,7 @@ const Z80: CPU = {
   LDrn_d: function() { Z80._r.d=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
   LDrn_e: function() { Z80._r.e=MMU.rb(Z80._r.pc); Z80._r.pc++; Z80._r.m=2; },
   LDrr_ad: function() { Z80._r.a=Z80._r.d; Z80._r.m=1; },
+  LDHLDA: function() { MMU.wb((Z80._r.h<<8)+Z80._r.l, Z80._r.a); Z80._r.l=(Z80._r.l-1)&255; if(Z80._r.l==255) Z80._r.h=(Z80._r.h-1)&255; Z80._r.m=2; },
 
 
   //*== increase instructions ==*
@@ -103,11 +106,20 @@ const Z80: CPU = {
       Z80._r.m = 3; Z80._r.t = 12;
     },
     JPNZnn: function() { Z80._r.m=3; if((Z80._r.f&0x80)==0x00) { Z80._r.pc=MMU.rw(Z80._r.pc); Z80._r.m++; } else Z80._r.pc+=2; },
+    JRNZn: function() { 
+      let i=MMU.rb(Z80._r.pc); if(i>127) i=-((~i+1)&255); Z80._r.pc++; Z80._r.m=2; if((Z80._r.f&0x80)==0x00) { Z80._r.pc+=i; Z80._r.m++; } },
     HALT: function() {
       Z80._halt = 1;
       Z80._r.m = 1; Z80._r.t = 4;
       console.log('Set halt flag');
-    }
+    },
+    MAPcb: function() {
+      const i=MMU.rb(Z80._r.pc); Z80._r.pc++;
+      Z80._r.pc &=65535;
+      if(Z80._cbmap[i]) Z80._cbmap[i]();
+      console.log(`Calling 0xCB instruction ${i}`);
+    },
+    BIT7h: function() { Z80._r.f&=0x1F; Z80._r.f|=0x20; Z80._r.f=(Z80._r.h&0x80)?0:0x80; Z80._r.m=2; },
   },
   reset: function() {
     Z80._r.a = 0; Z80._r.b = 0; Z80._r.c = 0; Z80._r.d = 0;
@@ -151,7 +163,7 @@ Z80._map = [
   Z80._ops.LDABCm,  // 0x0A * correct place
   Z80._ops.PUSHBC,  // 0x0B
   Z80._ops.POPHL,   // 0x0C
-  Z80._ops.XOR_a,   // 0x0D
+  Z80._ops.XOR_a,   // 0x0D legacy (replace when possible)
   Z80._ops.LDmmHL,  // 0x0E
                     // 0x0F moved CPr_b to coreect address 0xB8
 ];
@@ -160,20 +172,27 @@ Z80._map[0x15] = Z80._ops.DECr_d;
 Z80._map[0x16] = Z80._ops.LDrn_d; 
 Z80._map[0x1C] = Z80._ops.INCr_e;
 Z80._map[0x1E] = Z80._ops.LDrn_e;
+Z80._map[0x20] = Z80._ops.JRNZn;
 Z80._map[0x21] = Z80._ops.LDHLnn;
 Z80._map[0x22] = Z80._ops.LDHLIA;
 Z80._map[0x23] = Z80._ops.INCHL;
+Z80._map[0x31] = Z80._ops.LDSPnn,
+Z80._map[0x32] = Z80._ops.LDHLDA;
 Z80._map[0x34] = Z80._ops.INCHLm;
 Z80._map[0x36] = Z80._ops.LDHLmn;
 Z80._map[0x70] = Z80._ops.LDHLmr_b;
 Z80._map[0x76] = Z80._ops.HALT;
 Z80._map[0x77] = Z80._ops.LDHLmr_a;
 Z80._map[0x7A] = Z80._ops.LDrr_ad;
+Z80._map[0xAF] = Z80._ops.XOR_a;
 Z80._map[0xB8] = Z80._ops.CPr_b; 
 Z80._map[0xBA] = Z80._ops.CPr_d
 Z80._map[0xBB] = Z80._ops.CPr_e;
 Z80._map[0xC2] = Z80._ops.JPNZnn;
 Z80._map[0xC3] = Z80._ops.JPnn;
+Z80._map[0xCB] = Z80._ops.MAPcb;
+
+Z80._cbmap[0x7C] = Z80._ops.BIT7h;
 
 
 export default Z80;

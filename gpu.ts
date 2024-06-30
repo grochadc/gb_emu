@@ -18,7 +18,7 @@ type GPU = {
   _scy: number;
   _bgmap: number;
   _palette : {
-    bg: number[];
+    bg: [number, number, number, number][];
   }
   _bgmapbase_addr: (0x1800 | 0x1C00);
   _bgtile: 0|1;
@@ -60,9 +60,11 @@ const GPU: GPU = {
             }
         }
 
-        for(let i=0;i<4;i++) {
-          GPU._palette.bg[i] = 255;
-        }
+        // for(let i=0;i<4;i++) {
+        //  GPU._palette.bg[i] = 255;
+        // }
+
+        GPU._palette.bg = [[255, 255, 255, 255],[192, 192, 192, 255],[96, 96, 96, 255],[0, 0, 0, 255]];
         /*
         console.log("init canvas");
       let c = document.querySelector("#screen");
@@ -141,7 +143,7 @@ const GPU: GPU = {
       // scx 0x00 to 0x07 returns tile 0, scx 0x08 to 0x0F returns tile 1 etc
 
       // Where to render on the canvas
-	    const canvasoffs = GPU._line * 160 * 4;
+	    let canvasoffs = GPU._line * 160 * 4;
 
       // mapbase+lineoffs = skips bgmap and tiles outside the screen scx
       // tile_id is first byte of tile info (before encoding/coloring)
@@ -149,32 +151,33 @@ const GPU: GPU = {
       // VRAM contains pairs of bytes to color a tile line VRAM = [0x07, 0x07, 0x08, 0x08]
       const tilerow = GPU._tileset[tile_id][y]; // eg. [0,1,2,2,3,0,0,0]
 
-
-      // read tile index from the background map
-      let colour: number; // shouldn't it be number[]? since later it is called as colour[0]
-
       // If the tile data set in use is #1, the
 	    // indices are signed; calculate a real tile offset
 	    if(GPU._bgtile == 1 && tile_id < 128) tile_id += 256;
 
+      // read tile index from the background map
+      let colour: [number, number, number, number]; // 4 numbers are required in Canvas API r,g,b,a
+
       for(let i=0;i<160;i++){
         const pixel_from_tile_gb_encoded = GPU._tileset[tile_id][y][x]; // gb_encoded = 0|1|2|3;
         colour = GPU._palette.bg[pixel_from_tile_gb_encoded];
+        // palette has the array we need to push into canvas for 1 pixel
+        // [r,g,b,a] there are 4 arrays matching the four colors in gbcolor 0,1,2,3,
+
         // Plot the pixel to canvas
-        /*
 	    GPU._scrn.data[canvasoffs+0] = colour[0];
 	    GPU._scrn.data[canvasoffs+1] = colour[1];
 	    GPU._scrn.data[canvasoffs+2] = colour[2];
 	    GPU._scrn.data[canvasoffs+3] = colour[3];
 	    canvasoffs += 4;
-      */
 
 	    // When this tile ends, read another
 	    x++;
-	    if(x == 8) {
+	    if(x === 8) {
 		      x = 0;
 		      lineoffs = (lineoffs + 1) & 31;
-		      let tile = GPU._vram[mapbase+lineoffs];
+		      tile_id = GPU._vram[mapbase+lineoffs];
+          if(GPU._bgtile == 1 && tile_id < 128) tile_id += 256;
 	      }
       }
     },
@@ -245,10 +248,10 @@ const GPU: GPU = {
 
           for(let i=0;i<4;i++){
             switch((val>>(i*2))&3){
-              case 0: GPU._palette.bg[i] = 255; break;
-              case 1: GPU._palette.bg[i] = 192; break;
-              case 2: GPU._palette.bg[i] = 96; break;
-              case 3: GPU._palette.bg[i] = 0; break;
+              case 0: GPU._palette.bg[i] = [255, 255, 255,255]; break;
+              case 1: GPU._palette.bg[i] = [192, 192, 192, 255]; break;
+              case 2: GPU._palette.bg[i] = [96, 96, 96, 255]; break;
+              case 3: GPU._palette.bg[i] = [0, 0, 0, 255]; break;
             }
           }
         break;

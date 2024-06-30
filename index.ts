@@ -122,7 +122,6 @@ function runInstructions() {
     const LOAD_LINE_INTO_SCREEN = [];
 
     MMU.load(LOAD_TILE_LOOP_ROM);
-    MMU._bios[255] = 0x00; // NOP last instruction on BIOS, PC already jumped to exec 256
 
     startCPU();
   }
